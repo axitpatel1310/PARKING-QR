@@ -3,14 +3,9 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   typescript: {
-    // 🚩 Allows production builds to successfully complete even if
-    // there are TypeScript errors. Remove once clean.
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: true, // optional, remove once clean
   },
-  eslint: {
-    // 🚩 Skip ESLint during Vercel build
-    ignoreDuringBuilds: true,
-  },
+  // (no 'eslint' key here on Next 16)
 };
 
 export default nextConfig;
