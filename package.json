@@ -6,5 +6,13 @@
     "postinstall": "prisma generate",
     "seed": "prisma db seed"
   },
-  "prisma": { "seed": "node prisma/seed.cjs" }
+  "prisma": {
+    "seed": "node prisma/seed.cjs"
+  },
+  "devDependencies": {
+    "prisma": "^6.19.0"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.19.0"
+  }
 }
