@@ -1,34 +1,33 @@
-require('dotenv').config();
-const { PrismaClient } = require('@prisma/client');
-const bcrypt = require('bcrypt');
+require("dotenv").config();
+const { PrismaClient } = require("@prisma/client");
+const bcrypt = require("bcrypt");
 
 const prisma = new PrismaClient();
 
 async function main() {
-  // Settings singleton
+  // Settings singleton (id = 1)
   await prisma.settings.upsert({
     where: { id: 1 },
     update: {},
     create: {
       id: 1,
-      lotLat: parseFloat(process.env.LOT_LAT || "43.6532"),
-      lotLng: parseFloat(process.env.LOT_LNG || "-79.3832"),
-      geofenceRadiusM: parseInt(process.env.GEOFENCE_RADIUS_M || "100", 10),
-      rateCents: Math.round(parseFloat(process.env.BILLING_RATE_PER_HOUR || "10") * 100),
-      timezone: process.env.APP_TIMEZONE || "America/Toronto",
+      lotLat: 23.0490112,
+      lotLng: 72.5221376,
+      geofenceRadiusM: 100,
+      rateCents: 1000,
+      timezone: "America/Toronto",
     },
   });
 
-  // Admin (single)
-  const email = "admin@example.com";
-  const passwordHash = await bcrypt.hash("admin123", 10);
+  // Admin (if you still keep it, else remove)
+  const hash = await bcrypt.hash("admin123", 10);
   await prisma.admin.upsert({
-    where: { email },
-    update: {},
-    create: { email, password: passwordHash },
+    where: { email: "admin@example.com" },
+    update: { password: hash },
+    create: { email: "admin@example.com", password: hash },
   });
 
-  console.log("Seeded settings + admin:", email, "(password: admin123)");
+  console.log("Seeded settings + admin: admin@example.com (password: admin123)");
 }
 
 main()
