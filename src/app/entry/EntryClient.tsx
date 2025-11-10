@@ -1,4 +1,6 @@
+// entry/EntryClient.tsx
 "use client";
+
 import { useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
@@ -9,41 +11,69 @@ export default function EntryClient() {
 
   useEffect(() => {
     (async () => {
-      if (!token) { router.replace("/sorry?reason=missing_token"); return; }
-      if (!("geolocation" in navigator)) { router.replace("/sorry?reason=no_geolocation_api"); return; }
+      // Basic checks
+      if (!token) {
+        router.replace("/sorry?reason=missing_token");
+        return;
+      }
+      if (!("geolocation" in navigator)) {
+        router.replace("/sorry?reason=no_geolocation_api");
+        return;
+      }
+
+      const opts: PositionOptions = {
+        enableHighAccuracy: true,
+        timeout: 20000,
+        maximumAge: 0,
+      };
 
       navigator.geolocation.getCurrentPosition(
         async (pos) => {
-          const payload = { token, lat: pos.coords.latitude, lng: pos.coords.longitude };
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          const accuracy = pos.coords.accuracy; // meters (68% conf)
+          const ts = Date.now();
+
+          const payload = { token, lat, lng, accuracy, ts };
+
           try {
-            const res = await fetch("/api/entry/validate", {
+            const res = await fetch("/api/entry/verify", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
+              cache: "no-store",
               body: JSON.stringify(payload),
             });
+
             const data = await res.json().catch(() => ({}));
-            if (res.ok) {
+
+            if (res.ok && data?.ok) {
+              // success -> go to your success/search page
               router.replace(`/search?t=${encodeURIComponent(token)}`);
-            } else {
-              const q = new URLSearchParams({
-                reason: String(data?.reason ?? "unknown"),
-                d: data?.distance ? String(Math.round(data.distance)) : "",
-                lat: String(payload.lat),
-                lng: String(payload.lng),
-                lotlat: data?.lot?.lat ? String(data.lot.lat) : "",
-                lotlng: data?.lot?.lng ? String(data.lot.lng) : "",
-                r: data?.lot?.r ? String(data.lot.r) : "",
-              }).toString();
-              router.replace(`/sorry?${q}`);
+              return;
             }
+
+            // Failure: redirect to /sorry with rich context
+            const reason = String(data?.reason ?? "unknown");
+            const q = new URLSearchParams();
+            q.set("reason", reason);
+            if (typeof data?.distance === "number") q.set("d", String(Math.round(data.distance)));
+            q.set("lat", String(lat));
+            q.set("lng", String(lng));
+            if (data?.lot?.lat) q.set("lotlat", String(data.lot.lat));
+            if (data?.lot?.lng) q.set("lotlng", String(data.lot.lng));
+            if (data?.lot?.r) q.set("r", String(data.lot.r));
+
+            router.replace(`/sorry?${q.toString()}`);
           } catch {
             router.replace("/sorry?reason=network_error");
           }
         },
         (err) => {
-          router.replace(`/sorry?reason=geo_denied_${err?.code ?? "x"}`);
+          // 1 = PERMISSION_DENIED, 2 = POSITION_UNAVAILABLE, 3 = TIMEOUT
+          const reason = err?.code === 1 ? "geo_denied" : "geo_denied";
+          router.replace(`/sorry?reason=${reason}`);
         },
-        { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
+        opts
       );
     })();
   }, [router, token]);

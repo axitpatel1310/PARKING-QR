@@ -1,7 +1,8 @@
+// entry/page.tsx
 import { Suspense } from "react";
 import EntryClient from "./EntryClient";
 
-export const dynamic = "force-dynamic"; // avoids prerender / token issues
+export const dynamic = "force-dynamic";
 
 export default function EntryPage() {
   return (
