@@ -1,0 +1,86 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Admin {
+  id        String  @id @default(cuid())
+  email     String  @unique
+  password  String  // bcrypt hash
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model User {
+  id             String   @id @default(cuid())
+  name           String
+  email          String?  @unique
+  address        String?
+  numberPlate    String?  @db.VarChar(32)
+  phone          String?  @db.VarChar(32)
+  registeredAt   DateTime @default(now()) // anchors the user’s billing week
+  isActive       Boolean  @default(true)
+
+  sessions       ParkingSession[]
+  invoices       Invoice[]
+
+  @@index([name])
+  @@index([numberPlate])
+  @@index([phone])
+}
+
+model ParkingSession {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  inAt      DateTime
+  outAt     DateTime?
+  sourceLat Float?
+  sourceLng Float?
+  createdAt DateTime @default(now())
+
+  @@index([userId, inAt])
+}
+
+enum InvoiceStatus {
+  DRAFT
+  OPEN
+  PAID
+  PARTIAL
+  VOID
+}
+
+model Invoice {
+  id           String        @id @default(cuid())
+  userId       String
+  user         User          @relation(fields: [userId], references: [id])
+  periodStart  DateTime      // inclusive
+  periodEnd    DateTime      // exclusive
+  totalMinutes Int           // raw minutes in period (computed)
+  billedHours  Int           // hours after 15-min rule
+  rateCents    Int           // snapshot of $/hour * 100 at generation time
+  amountCents  Int           // billedHours * rateCents + adjustments
+  adjustmentsCents Int       @default(0) // manual overrides (+/-)
+  status       InvoiceStatus @default(OPEN)
+  markedPaidAt DateTime?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([userId, periodStart, periodEnd])
+}
+
+model Settings {
+  id                 Int      @id @default(1)
+  lotLat             Float
+  lotLng             Float
+  geofenceRadiusM    Int      @default(100)
+  rateCents          Int      @default(1000) // $10/hr
+  timezone           String   @default("America/Toronto")
+  // Hourly token rotation (seconds)
+  tokenRotationSec   Int      @default(3600)
+  // Only one row
+}
