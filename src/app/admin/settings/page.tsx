@@ -4,6 +4,9 @@ import QRCode from "qrcode";
 import { currentHourToken } from "@/lib/qr";
 import { SetLotToCurrent } from "./SetLotToCurrent"; // client component
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 async function updateSettings(formData: FormData) {
   "use server";
   const lotLat = parseFloat(String(formData.get("lotLat") || "0"));
