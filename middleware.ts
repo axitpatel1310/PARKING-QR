@@ -1,6 +1,6 @@
-// middleware.ts
-import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
+// before: middleware.ts (Edge runtime)
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 
 function wantsJson(req: NextRequest) {
   const accept = req.headers.get("accept") || "";

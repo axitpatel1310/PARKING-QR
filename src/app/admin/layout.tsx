@@ -1,3 +1,6 @@
+// top of file
+export const dynamic = "force-dynamic";
+
 import Link from "next/link";
 import { ReactNode } from "react";
 import SignOut from "./signout";
