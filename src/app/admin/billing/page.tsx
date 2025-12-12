@@ -3,15 +3,23 @@ import { minutesForUserInAnchoredWeek, minutesToBilledHoursWithGrace } from "@/l
 import { revalidatePath } from "next/cache";
 
 // --- Server actions ---
+// app/admin/billing/page.tsx (only replace relevant sections)
+import { prisma } from "@/lib/prisma";
+import { minutesForUserInAnchoredWeek, minutesToBilledHoursWithGrace } from "@/lib/billing";
+import { revalidatePath } from "next/cache";
+
+// --- Server actions ---
 
 async function generateInvoices(formData: FormData) {
   "use server";
   const ref = new Date(String(formData.get("refDate") || new Date().toISOString().slice(0,10)));
   const settings = await prisma.settings.findUnique({ where: { id: 1 } });
-  const rateCents = settings?.rateCents ?? 1000;
+  const defaultRateCents = settings?.rateCents ?? 1000;
 
+  // ensure the user query includes rateCents
   const users = await prisma.user.findMany({ where: { isActive: true } });
   for (const u of users) {
+    const userRateCents = (u as any).rateCents ?? defaultRateCents;
     const { minutes, window } = await minutesForUserInAnchoredWeek(u.id, ref);
     const billedHours = minutesToBilledHoursWithGrace(minutes);
     // Upsert per-user invoice for that window
@@ -26,8 +34,8 @@ async function generateInvoices(formData: FormData) {
       update: {
         totalMinutes: minutes,
         billedHours,
-        rateCents,
-        amountCents: billedHours * rateCents, // ignores adjustments here
+        rateCents: userRateCents,
+        amountCents: billedHours * userRateCents, // ignores adjustments here
         status: "OPEN",
       },
       create: {
@@ -36,8 +44,8 @@ async function generateInvoices(formData: FormData) {
         periodEnd: window.end,
         totalMinutes: minutes,
         billedHours,
-        rateCents,
-        amountCents: billedHours * rateCents,
+        rateCents: userRateCents,
+        amountCents: billedHours * userRateCents,
         status: "OPEN",
       }
     });
@@ -87,21 +95,21 @@ export default async function BillingPage({ searchParams }: { searchParams: { re
 
   // Show latest generated window (we'll compute against ref just for preview)
   const settings = await prisma.settings.findUnique({ where: { id: 1 } });
-  const rateCents = settings?.rateCents ?? 1000;
+  const defaultRateCents = settings?.rateCents ?? 1000;
 
-  // Pull all OPEN/DRAFT/PARTIAL invoices that cover the week-of-ref
   const users = await prisma.user.findMany({ where: { isActive: true }, orderBy: { name: "asc" } });
 
   // Compute (preview) minutes for each user for the ref-week
   const rows = await Promise.all(users.map(async (u) => {
+    const userRateCents = (u as any).rateCents ?? defaultRateCents;
     const { minutes, window } = await minutesForUserInAnchoredWeek(u.id, ref);
     const billedHours = minutesToBilledHoursWithGrace(minutes);
-    const baseAmount = billedHours * rateCents;
+    const baseAmount = billedHours * userRateCents;
     const existing = await prisma.invoice.findFirst({
       where: { userId: u.id, periodStart: window.start, periodEnd: window.end },
       orderBy: { createdAt: "desc" }
     });
-    return { u, minutes, billedHours, window, baseAmount, invoice: existing };
+    return { u, minutes, billedHours, window, baseAmount, invoice: existing, userRateCents };
   }));
 
   // A canonical window for CSV link – use first row if any; otherwise ref as both
@@ -117,7 +125,7 @@ export default async function BillingPage({ searchParams }: { searchParams: { re
           <span className="text-sm opacity-70">Reference date</span>
           <input type="date" name="refDate" defaultValue={ref.toISOString().slice(0,10)} className="border p-2 rounded" />
         </label>
-        <button className="bg-black text-white px-4 py-2 rounded">Generate/Update invoices</button>
+        <button className="bg-black text-white px-4 py-2 rounded">Generate Salary Sheet</button>
         {first && <a className="px-3 py-2 border rounded" href={csvLink} target="_blank">Export CSV</a>}
       </form>
 
@@ -127,25 +135,29 @@ export default async function BillingPage({ searchParams }: { searchParams: { re
             <th className="p-2 border text-left">User</th>
             <th className="p-2 border text-left">Window</th>
             <th className="p-2 border text-right">Minutes</th>
-            <th className="p-2 border text-right">Billed Hours</th>
+            <th className="p-2 border text-right">Hourly Rate</th>
+            <th className="p-2 border text-right">Hours</th>
             <th className="p-2 border text-right">Amount</th>
             <th className="p-2 border text-left">Status</th>
             <th className="p-2 border text-left">Override / Actions</th>
           </tr>
         </thead>
         <tbody>
-          {rows.map(({ u, minutes, billedHours, baseAmount, window, invoice }) => {
+          {rows.map(({ u, minutes, billedHours, baseAmount, window, invoice, userRateCents }) => {
             const amountCents = invoice?.amountCents ?? baseAmount;
             const status = invoice?.status ?? "DRAFT";
+            const displayedRate = (invoice?.rateCents ?? userRateCents ?? defaultRateCents) / 100;
             return (
               <tr key={u.id}>
                 <td className="p-2 border">{u.name}</td>
                 <td className="p-2 border">{window.start.toLocaleDateString()} → {window.end.toLocaleDateString()}</td>
                 <td className="p-2 border text-right">{minutes}</td>
+                <td className="p-2 border text-right">${displayedRate.toFixed(2)}</td>
                 <td className="p-2 border text-right">{billedHours}</td>
                 <td className="p-2 border text-right">${(amountCents/100).toFixed(2)}</td>
                 <td className="p-2 border">{status}</td>
                 <td className="p-2 border">
+                  {/* override form unchanged */}
                   <form action={applyOverride} className="flex items-center gap-2">
                     <input type="hidden" name="invoiceId" value={invoice?.id || ""} />
                     <input name="overrideAmount" placeholder="Override $" defaultValue={invoice ? (invoice.amountCents/100).toFixed(2) : ""} className="border p-1 rounded w-28" />
@@ -168,6 +180,7 @@ export default async function BillingPage({ searchParams }: { searchParams: { re
             );
           })}
         </tbody>
+
       </table>
 
       <p className="text-xs opacity-70">

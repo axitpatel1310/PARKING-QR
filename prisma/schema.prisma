@@ -25,6 +25,9 @@ model User {
   registeredAt   DateTime @default(now()) // anchors the user’s billing week
   isActive       Boolean  @default(true)
 
+  // NEW: per-user hourly rate in cents. Default $10/hr = 1000 cents
+  rateCents      Int      @default(1000)
+
   sessions       ParkingSession[]
   invoices       Invoice[]
 

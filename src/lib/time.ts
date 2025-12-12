@@ -3,7 +3,7 @@ import { differenceInMinutes } from "date-fns";
 export function minutesToBilledHoursWithGrace(totalMinutes: number): number {
   const h = Math.floor(totalMinutes / 60);
   const extra = totalMinutes % 60;
-  return h + (extra >= 15 ? 1 : 0);
+  return h + (extra >= 30 ? 1 : 0);
 }
 
 export function overlappedMinutes(aStart: Date, aEnd: Date, bStart: Date, bEnd: Date) {

@@ -42,7 +42,6 @@ export default function UserDetail() {
   return (
     <div className="p-6 max-w-2xl mx-auto space-y-4">
       <div className="text-2xl font-semibold">{data.user.name}</div>
-      <div className="text-sm opacity-70">Plate: {data.user.numberPlate} · Phone: {data.user.phone}</div>
       <div className="text-sm opacity-70">Registered: {new Date(data.user.registeredAt).toLocaleString()}</div>
 
       <div className="p-4 border rounded">

@@ -1,8 +1,10 @@
+// app/admin/users/[id]/page.tsx
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { notFound, redirect } from "next/navigation";
 import { z } from "zod";
 import DeleteConfirmButton from "./DeleteConfirmButton";
+
 const editSchema = z.object({
   name: z.string().min(1, "Name is required"),
   email: z.string().email().optional().or(z.literal("")),
@@ -10,6 +12,7 @@ const editSchema = z.object({
   numberPlate: z.string().optional().or(z.literal("")),
   phone: z.string().optional().or(z.literal("")),
   isActive: z.string().optional(), // "on" if checked
+  rate: z.string().optional().or(z.literal("10")), // rate string
 });
 
 async function updateUser(_prev: unknown, formData: FormData) {
@@ -22,21 +25,30 @@ async function updateUser(_prev: unknown, formData: FormData) {
     numberPlate: formData.get("numberPlate")?.toString() ?? "",
     phone: formData.get("phone")?.toString() ?? "",
     isActive: formData.get("isActive")?.toString(),
+    rate: formData.get("rate")?.toString() ?? "10",
   });
   if (!parsed.success) {
     return { ok: false, error: parsed.error.errors[0]?.message ?? "Invalid data" };
   }
   const d = parsed.data;
+
+  // parse rate
+  const rateParsed = parseFloat(String(d.rate).replace(/[^0-9.\-]/g, ""));
+  const rateCents = Number.isNaN(rateParsed) ? undefined : Math.round(rateParsed * 100);
+
+  const updateData: any = {
+    name: d.name.trim(),
+    email: d.email || null,
+    address: d.address || null,
+    numberPlate: d.numberPlate || null,
+    phone: d.phone || null,
+    isActive: d.isActive === "on",
+  };
+  if (rateCents !== undefined) updateData.rateCents = rateCents;
+
   await prisma.user.update({
     where: { id },
-    data: {
-      name: d.name.trim(),
-      email: d.email || null,
-      address: d.address || null,
-      numberPlate: d.numberPlate || null,
-      phone: d.phone || null,
-      isActive: d.isActive === "on",
-    },
+    data: updateData,
   });
   revalidatePath(`/admin/users/${id}`);
   return { ok: true };
@@ -76,13 +88,15 @@ export default async function UserDetail({
           <span className="text-sm opacity-70">Email</span>
           <input name="email" type="email" defaultValue={user.email ?? ""} className="border p-2 rounded" />
         </label>
+
+        <label className="grid gap-1">
+          <span className="text-sm opacity-70">Hourly rate ($)</span>
+          <input name="rate" defaultValue={((user as any).rateCents ?? 1000) / 100} className="border p-2 rounded w-32" />
+        </label>
+
         <label className="grid gap-1 md:col-span-2">
           <span className="text-sm opacity-70">Address</span>
           <input name="address" defaultValue={user.address ?? ""} className="border p-2 rounded" />
-        </label>
-        <label className="grid gap-1">
-          <span className="text-sm opacity-70">Number plate</span>
-          <input name="numberPlate" defaultValue={user.numberPlate ?? ""} className="border p-2 rounded" />
         </label>
         <label className="grid gap-1">
           <span className="text-sm opacity-70">Phone</span>
@@ -108,7 +122,7 @@ export default async function UserDetail({
         >
             Delete user
         </DeleteConfirmButton>
-        </form>
+      </form>
 
       {/* Quick info */}
       <section className="border rounded p-4 text-sm">

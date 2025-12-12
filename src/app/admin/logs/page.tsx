@@ -49,7 +49,6 @@ export default async function LogsPage({
         <thead>
           <tr className="bg-gray-50">
             <th className="p-2 border text-left">User</th>
-            <th className="p-2 border text-left">Number Plate</th>
             <th className="p-2 border text-left">IN</th>
             <th className="p-2 border text-left">OUT</th>
             <th className="p-2 border text-left">Duration</th>
@@ -66,7 +65,6 @@ export default async function LogsPage({
             return (
               <tr key={s.id}>
                 <td className="p-2 border">{s.user?.name}</td>
-                <td className="p-2 border">{s.user?.numberPlate ?? ""}</td>
                 <td className="p-2 border">{inTime}</td>
                 <td className="p-2 border">{outTime}</td>
                 <td className="p-2 border">

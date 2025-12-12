@@ -1,3 +1,4 @@
+// app/admin/users/page.tsx
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import Link from "next/link";
@@ -9,6 +10,7 @@ const userSchema = z.object({
   address: z.string().optional().or(z.literal("")),
   numberPlate: z.string().optional().or(z.literal("")),
   phone: z.string().optional().or(z.literal("")),
+  rate: z.string().optional().or(z.literal("10")), // accepted as string from form
 });
 
 async function createUser(formData: FormData) {
@@ -17,20 +19,23 @@ async function createUser(formData: FormData) {
     name: formData.get("name")?.toString() ?? "",
     email: formData.get("email")?.toString() ?? "",
     address: formData.get("address")?.toString() ?? "",
-    numberPlate: formData.get("numberPlate")?.toString() ?? "",
     phone: formData.get("phone")?.toString() ?? "",
+    rate: formData.get("rate")?.toString() ?? "10",
   });
   if (!parsed.success) {
     return { ok: false, error: parsed.error.errors[0]?.message ?? "Invalid data" };
   }
   const data = parsed.data;
+  const rateParsed = parseFloat(String(data.rate).replace(/[^0-9.\-]/g, ""));
+  const rateCents = Number.isNaN(rateParsed) ? 1000 : Math.round(rateParsed * 100);
+
   await prisma.user.create({
     data: {
       name: data.name.trim(),
       email: data.email || null,
       address: data.address || null,
-      numberPlate: data.numberPlate || null,
       phone: data.phone || null,
+      rateCents,
     },
   });
   revalidatePath("/admin/users");
@@ -59,13 +64,13 @@ export default async function UsersPage() {
             <span className="text-sm opacity-70">Email</span>
             <input name="email" type="email" className="border p-2 rounded" />
           </label>
+          <label className="grid gap-1">
+            <span className="text-sm opacity-70">Hourly rate ($)</span>
+            <input name="rate" defaultValue="10.00" className="border p-2 rounded w-32" />
+          </label>
           <label className="grid gap-1 md:col-span-2">
             <span className="text-sm opacity-70">Address</span>
             <input name="address" className="border p-2 rounded" />
-          </label>
-          <label className="grid gap-1">
-            <span className="text-sm opacity-70">Number plate</span>
-            <input name="numberPlate" className="border p-2 rounded" />
           </label>
           <label className="grid gap-1">
             <span className="text-sm opacity-70">Phone</span>
@@ -83,10 +88,10 @@ export default async function UsersPage() {
           <thead>
             <tr className="bg-gray-50">
               <th className="text-left p-2 border">Name</th>
-              <th className="text-left p-2 border">Plate</th>
               <th className="text-left p-2 border">Phone</th>
               <th className="text-left p-2 border">Email</th>
               <th className="text-left p-2 border">Registered</th>
+              <th className="text-left p-2 border">Rate ($/hr)</th>
               <th className="text-left p-2 border">Actions</th>
             </tr>
           </thead>
@@ -94,12 +99,12 @@ export default async function UsersPage() {
             {users.map((u) => (
               <tr key={u.id}>
                 <td className="p-2 border">{u.name}</td>
-                <td className="p-2 border">{u.numberPlate ?? ""}</td>
                 <td className="p-2 border">{u.phone ?? ""}</td>
                 <td className="p-2 border">{u.email ?? ""}</td>
                 <td className="p-2 border">
                   {new Date(u.registeredAt).toLocaleString()}
                 </td>
+                <td className="p-2 border text-right">{((u as any).rateCents ?? 1000) / 100}</td>
                 <td className="p-2 border">
                   <Link className="underline" href={`/admin/users/${u.id}`}>
                     View / Edit
