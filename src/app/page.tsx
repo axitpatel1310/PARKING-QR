@@ -8,7 +8,7 @@ export default function HomePage() {
       <header className="border-b bg-white/70 backdrop-blur">
         <div className="mx-auto max-w-6xl px-6 py-4 flex items-center gap-6">
           <div className="text-xl font-semibold tracking-tight">
-            QR Parking
+            Employee Punching System
           </div>
           <nav className="ml-auto flex items-center gap-4">
             <Link
